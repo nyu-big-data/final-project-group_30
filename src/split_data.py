@@ -10,8 +10,10 @@ import getpass
 # And pyspark.sql to get the spark session
 from pyspark.sql import SparkSession
 #Importing for groupby
-from pyspark.sql import functions as F
+from pyspark.sql.functions import *
 from pyspark.sql import DataFrame
+from pyspark.sql.types import StructType,StructField,DateType,FloatType,IntegerType
+import random
 
 def main(spark, netID):
 	path_small = f'hdfs:/user/{netID}/ml-latest-small/ratings.csv'
@@ -19,7 +21,7 @@ def main(spark, netID):
 
 
 	#Read
-	ratings_small = spark.read.csv(path_small, schema='userId INT, movieId INT, rating FLOAT, timestamp TIMESTAMP')
+	ratings_small = spark.read.csv(path_small, schema='userId INT, movieId INT, rating FLOAT, timestamp BIGINT')
 	ratings_small.printSchema()
 	
 	# Give the dataframe a temporary view so we can run SQL queries
@@ -28,36 +30,47 @@ def main(spark, netID):
 	#Obtain userIds
 	select_uids = spark.sql('SELECT distinct(userId) FROM ratings_small where userId is not null order by userId').collect()
 
+
+
 	#Iterate 
-	subdf_of_userId = spark.sql(f'SELECT * FROM ratings_small where userId={select_uids[0][0]}')
-	train_ratings_small,test_ratings_small,val_ratings_small = subdf_of_userId.randomSplit([0.8, 0.1,0.1], seed=30)
+	train_ratings_small = None
+	test_ratings_small = None
+	val_ratings_small = None
 
 
-	q = spark.sql('select count(*) from ratings_small').show()
-	first = False
 	for row in select_uids:
-		if not first:
-			first = True
-			continue
 		userId = row[0]
+		# print(userId)
 		subdf_of_userId = spark.sql(f'SELECT * FROM ratings_small where userId={userId}')
-		train,test,val = subdf_of_userId.randomSplit([0.8, 0.1,0.1], seed=30)
+		subdf_of_userId = subdf_of_userId.select(col('userId'),col('movieId'),col('rating'),from_unixtime(col('timestamp'),'yyyy-MM-dd HH:mm:ss').alias('date'),from_unixtime(col('timestamp'),'yyyy').alias('Year').cast(IntegerType()))
 
 
-		train_ratings_small = train_ratings_small.union(train)
-		test_ratings_small = test_ratings_small.union(test)
-		val_ratings_small = val_ratings_small.union(val)
-	#80004 10311 10521
+		filtered_train = subdf_of_userId.filter(col('Year')!=2018)
+		filtered_train = filtered_train.select(col('userId'),col('movieId'),col('rating'),col('date'))
+		if not train_ratings_small:
+			train_ratings_small = filtered_train
+		else:
+			train_ratings_small = train_ratings_small.union(filtered_train)
+		if random.choice([0,1]) == 0: # Val
+			filtered_val = subdf_of_userId.filter(col('Year')==2018)
+			filtered_val = filtered_val.select(col('userId'),col('movieId'),col('rating'),col('date'))
+			if not val_ratings_small:
+				val_ratings_small = filtered_val
+			else:
+				val_ratings_small = val_ratings_small.union(filtered_val)
+		else: # Test
+			filtered_test = subdf_of_userId.filter(col('Year')==2018)
+			filtered_test = filtered_test.select(col('userId'),col('movieId'),col('rating'),col('date'))
+			if not test_ratings_small:
+				test_ratings_small = filtered_test
+			else:
+				test_ratings_small = test_ratings_small.union(filtered_test)
+
+
 	print(train_ratings_small.count(),test_ratings_small.count(),val_ratings_small.count())
 	train_ratings_small.write.parquet(f'hdfs:/user/{netID}/ml-latest-small/train_ratings_small.parquet')
 	test_ratings_small.write.parquet(f'hdfs:/user/{netID}/ml-latest-small/test_ratings_small.parquet')
 	val_ratings_small.write.parquet(f'hdfs:/user/{netID}/ml-latest-small/val_ratings_small.parquet')	
-
-
-def randomSplit(userId):
-	subdf_of_userId = spark.sql(f'SELECT * FROM ratings_small where userId={userId}')
-	train,test,val = subdf_of_userId.randomSplit([0.8, 0.1,0.1], seed=30)
-	return train,test,val
 
 
 if __name__ == '__main__':
