@@ -17,11 +17,11 @@ import random
 
 def main(spark, netID):
 	path_small = f'hdfs:/user/{netID}/ml-latest-small/ratings.csv'
-	path_large = '/scratch/work/courses/DSGA1004-2021/movielens/ml-latest/ratings.csv'
+	# path_large = '/scratch/work/courses/DSGA1004-2021/movielens/ml-latest/ratings.csv'
 
 
 	#Read
-	ratings_small = spark.read.csv(path_small, schema='userId INT, movieId INT, rating FLOAT, timestamp BIGINT')
+	ratings_small = spark.read.csv(path_small, header=True,schema='userId INT, movieId INT, rating FLOAT, timestamp BIGINT')
 	ratings_small.printSchema()
 	
 	# Give the dataframe a temporary view so we can run SQL queries
