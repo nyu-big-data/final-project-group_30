@@ -1,4 +1,7 @@
 '''
+
+
+
 Takes the input data ratings and splits into train, validation and test data
 Stater code taken from lab3
 Data Copied to hfs, since working on spark
@@ -70,7 +73,9 @@ def main(spark, netID):
 	print(train_ratings_small.count(),test_ratings_small.count(),val_ratings_small.count())
 	train_ratings_small.write.parquet(f'hdfs:/user/{netID}/ml-latest-small/train_ratings_small.parquet')
 	test_ratings_small.write.parquet(f'hdfs:/user/{netID}/ml-latest-small/test_ratings_small.parquet')
-	val_ratings_small.write.parquet(f'hdfs:/user/{netID}/ml-latest-small/val_ratings_small.parquet')	
+	val_ratings_small.write.parquet(f'hdfs:/user/{netID}/ml-latest-small/val_ratings_small.parquet')
+
+
 
 
 if __name__ == '__main__':
