@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 import pyspark as ps
 import os, sys, requests, json
 from pyspark.ml.evaluation import RegressionEvaluator
-from pyspark.ml.recommendation import ALS
+from pyspark.ml.recommendation import ALS, ALSModel
 from pyspark.ml.tuning import CrossValidator, ParamGridBuilder
 from pyspark.ml import Pipeline
 from pyspark.sql import Row
@@ -35,44 +35,51 @@ def main(spark, netID):
 
 	movies = spark.read.csv(f'hdfs:/user/{netID}/ml-latest-small/movies.csv',header=True, schema='movieId INT, title string, genres string')
 
+	LOAD = True
 
-	seed = 5
-	iterations = 10
-	regularization_parameter = 0.1
-	rank = 4
+	if not LOAD:
+		seed = 5
+		iterations = 10
+		regularization_parameter = 0.1
+		rank = 4
 
-	als = ALS(maxIter=iterations, regParam=regularization_parameter, rank=rank, userCol="userId", itemCol="movieId", ratingCol="rating",seed=seed, nonnegative = True,coldStartStrategy="drop")
-	paramGrid = ParamGridBuilder() \
-    .addGrid(als.regParam, [0.1, 0.01]) \
-    .addGrid(als.rank, [4,5,6,7,8,9,10,11,12]) \
-    .build()
-	evaluator = RegressionEvaluator(metricName="rmse", labelCol="rating", predictionCol="prediction")
-	crossval = CrossValidator(estimator=als, \
-        estimatorParamMaps=paramGrid, \
-        evaluator=evaluator, \
-        numFolds=5)
-	cvModel = crossval.fit(train_ratings_small)
+		als = ALS(maxIter=iterations, regParam=regularization_parameter, rank=rank, userCol="userId", itemCol="movieId", ratingCol="rating",seed=seed, nonnegative = True,coldStartStrategy="drop")
+		paramGrid = ParamGridBuilder() \
+	    .addGrid(als.regParam, [0.1, 0.01]) \
+	    .addGrid(als.rank, [4,5,6,7,8,9,10,11,12]) \
+	    .build()
+		evaluator = RegressionEvaluator(metricName="rmse", labelCol="rating", predictionCol="prediction")
+		crossval = CrossValidator(estimator=als, \
+	        estimatorParamMaps=paramGrid, \
+	        evaluator=evaluator, \
+	        numFolds=5)
+		cvModel = crossval.fit(train_ratings_small)
 
-	#Extract best model from the cv model above
-	best_model = cvModel.bestModel
+		#Extract best model from the cv model above
+		best_model = cvModel.bestModel
 
 
-	cvModel_pred = best_model.transform(val_ratings_small) # Predict
-	cvModel_pred.show(n=10) # Show 10 predictions
-	cvModel_pred.join(movies,'movieId').select('userId','title','genres','prediction').show(5) # Show along with movie name
-	cvModel_pred = cvModel_pred.filter(col('prediction') != np.nan) # New Predictions
-	rmse = evaluator.evaluate(cvModel_pred)
+		cvModel_pred = best_model.transform(val_ratings_small) # Predict
+		cvModel_pred.show(n=10) # Show 10 predictions
+		cvModel_pred.join(movies,'movieId').select('userId','title','genres','prediction').show(5) # Show along with movie name
+		cvModel_pred = cvModel_pred.filter(col('prediction') != np.nan) # New Predictions
+		rmse = evaluator.evaluate(cvModel_pred)
 
-	print("the rmse for optimal grid parameters with cross validation is: {}".format(rmse))
+		print("the rmse for optimal grid parameters with cross validation is: {}".format(rmse))
 
-	print("**Best Model**")
-	# Print "Rank"
-	print("  Rank:", best_model._java_obj.parent().getRank())
-	# Print "MaxIter"
-	print("  MaxIter:", best_model._java_obj.parent().getMaxIter())
-	# Print "RegParam"
-	print("  RegParam:", best_model._java_obj.parent().getRegParam())
+		print("**Best Model**")
+		# Print "Rank"
+		print("  Rank:", best_model._java_obj.parent().getRank())
+		# Print "MaxIter"
+		print("  MaxIter:", best_model._java_obj.parent().getMaxIter())
+		# Print "RegParam"
+		print("  RegParam:", best_model._java_obj.parent().getRegParam())
 
+
+		#Save
+		best_model.write().overwrite().save(f'hdfs:/user/{netID}/ml-latest-small/train_ratings_small/als_model')
+	else:
+		best_model = ALSModel.load(f'hdfs:/user/{netID}/ml-latest-small/train_ratings_small/als_model')
 
 	#100th User’s ALS Recommendations
 	nrecommendations = best_model.recommendForAllUsers(5)
