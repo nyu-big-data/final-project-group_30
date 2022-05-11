@@ -17,60 +17,64 @@ import random
 
 def main(spark, netID):
 	path_small = f'hdfs:/user/{netID}/ml-latest-small/ratings.csv'
-	# path_large = '/scratch/work/courses/DSGA1004-2021/movielens/ml-latest/ratings.csv'
+	path_large = f'hdfs:/user/{netID}/ml-latest/ratings.csv'
+	store_small = 'ml-latest-small'
+	store_big = 'ml-latest'
+	small = 'small'
+	big = 'big'
 
 
 	#Read
-	ratings_small = spark.read.csv(path_small, header=True,schema='userId INT, movieId INT, rating FLOAT, timestamp BIGINT')
-	ratings_small.printSchema()
+	ratings = spark.read.csv(path_small, header=True,inferSchema=True)
+	ratings.printSchema()
 	
 	# Give the dataframe a temporary view so we can run SQL queries
-	ratings_small.createOrReplaceTempView('ratings_small')
+	ratings.createOrReplaceTempView('ratings')
 
 	#Obtain userIds
-	select_uids = spark.sql('SELECT distinct(userId) FROM ratings_small where userId is not null order by userId').collect()
+	select_uids = ratings.select('userId').distinct().collect()
 
 
 
 	#Iterate 
-	train_ratings_small = None
-	test_ratings_small = None
-	val_ratings_small = None
+	train_ratings = None
+	test_ratings = None
+	val_ratings = None
 
 
 	for row in select_uids:
 		userId = row[0]
 		# print(userId)
-		subdf_of_userId = spark.sql(f'SELECT * FROM ratings_small where userId={userId}')
+		subdf_of_userId = spark.sql(f'SELECT * FROM ratings where userId={userId}')
 		subdf_of_userId = subdf_of_userId.select(col('userId'),col('movieId'),col('rating'),from_unixtime(col('timestamp'),'yyyy-MM-dd HH:mm:ss').alias('date'),from_unixtime(col('timestamp'),'yyyy').alias('Year').cast(IntegerType()))
 
 
 		filtered_train = subdf_of_userId.filter(col('Year')!=2018)
 		filtered_train = filtered_train.select(col('userId'),col('movieId'),col('rating'),col('date'))
-		if not train_ratings_small:
-			train_ratings_small = filtered_train
+		if not train_ratings:
+			train_ratings = filtered_train
 		else:
-			train_ratings_small = train_ratings_small.union(filtered_train)
+			train_ratings = train_ratings.union(filtered_train)
 		if random.choice([0,1]) == 0: # Val
 			filtered_val = subdf_of_userId.filter(col('Year')==2018)
 			filtered_val = filtered_val.select(col('userId'),col('movieId'),col('rating'),col('date'))
-			if not val_ratings_small:
-				val_ratings_small = filtered_val
+			if not val_ratings:
+				val_ratings = filtered_val
 			else:
-				val_ratings_small = val_ratings_small.union(filtered_val)
+				val_ratings = val_ratings.union(filtered_val)
 		else: # Test
 			filtered_test = subdf_of_userId.filter(col('Year')==2018)
 			filtered_test = filtered_test.select(col('userId'),col('movieId'),col('rating'),col('date'))
-			if not test_ratings_small:
-				test_ratings_small = filtered_test
+			if not test_ratings:
+				test_ratings = filtered_test
 			else:
-				test_ratings_small = test_ratings_small.union(filtered_test)
+				test_ratings = test_ratings.union(filtered_test)
 
 
-	print(train_ratings_small.count(),test_ratings_small.count(),val_ratings_small.count())
-	train_ratings_small.write.parquet(f'hdfs:/user/{netID}/ml-latest-small/train_ratings_small.parquet')
-	test_ratings_small.write.parquet(f'hdfs:/user/{netID}/ml-latest-small/test_ratings_small.parquet')
-	val_ratings_small.write.parquet(f'hdfs:/user/{netID}/ml-latest-small/val_ratings_small.parquet')	
+	print(train_ratings.count(),test_ratings.count(),val_ratings.count())
+	train_ratings.write.mode("overwrite").parquet(f'hdfs:/user/{netID}/{store_small}/train_ratings_{small}.parquet')
+	test_ratings.write.mode("overwrite").parquet(f'hdfs:/user/{netID}/{store_small}/test_ratings_{small}.parquet')
+	val_ratings.write.mode("overwrite").parquet(f'hdfs:/user/{netID}/{store_small}/val_ratings_{small}.parquet')	
 
 
 if __name__ == '__main__':
