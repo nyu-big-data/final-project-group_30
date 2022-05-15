@@ -76,10 +76,6 @@ def als_grid_search_ranking(train,validation,maxIters,regParams, ranks,spark):
     return models, precision_at_k_scores,maps, NDCGs,rmses,times
 
 
-
-
-
-
 def main(spark, netID):
     train_ratings_small = spark.read.parquet(f'hdfs:/user/{netID}/ml-latest-small/train_ratings_small.parquet')
     val_ratings_small = spark.read.parquet(f'hdfs:/user/{netID}/ml-latest-small/val_ratings_small.parquet')
@@ -88,6 +84,7 @@ def main(spark, netID):
     ranks = [4,5,6,7,8,9,10,11,12]
     models, precision_at_k_scores,maps, NDCGs,rmses,times = als_grid_search_ranking(train_ratings_small,val_ratings_small,maxIters,regParams, ranks,spark)
 
+    print("SMALL DATASET:")
     print('**********************************************************************************************')
     print(precision_at_k_scores)
     print('**********************************************************************************************')
@@ -99,6 +96,7 @@ def main(spark, netID):
     print('**********************************************************************************************')
     print(times)
     print('**********************************************************************************************')
+
 
 if __name__ == '__main__':
 

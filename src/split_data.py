@@ -1,5 +1,4 @@
-'''
-Takes the input data ratings and splits into train, validation and test data
+ the input data ratings and splits into train, validation and test data
 Stater code taken from lab3
 Data Copied to hfs, since working on spark
 spark-submit --conf  spark.dynamicAllocation.enabled=true --conf spark.shuffle.service.enabled=false --conf spark.dynamicAllocation.shuffleTracking.enabled=true
@@ -23,8 +22,8 @@ def main(spark, netID):
 	small = 'small'
 	big = 'big'
 
-
-	#Read
+    #FOR SMALL DATASET
+	#Read dataset
 	ratings = spark.read.csv(path_small, header=True,inferSchema=True)
 	ratings.printSchema()
 	
@@ -33,8 +32,6 @@ def main(spark, netID):
 
 	#Obtain userIds
 	select_uids = ratings.select('userId').distinct().collect()
-
-
 
 	#Iterate 
 	train_ratings = None
@@ -75,6 +72,33 @@ def main(spark, netID):
 	train_ratings.write.mode("overwrite").parquet(f'hdfs:/user/{netID}/{store_small}/train_ratings_{small}.parquet')
 	test_ratings.write.mode("overwrite").parquet(f'hdfs:/user/{netID}/{store_small}/test_ratings_{small}.parquet')
 	val_ratings.write.mode("overwrite").parquet(f'hdfs:/user/{netID}/{store_small}/val_ratings_{small}.parquet')	
+
+
+    #FOR LARGE DATASET
+    #Read
+	ratings_large = spark.read.csv(path_large, header=True,inferSchema=True)
+	ratings_large.printSchema()
+	
+	# Give the dataframe a temporary view so we can run SQL queries
+	ratings_large.createOrReplaceTempView('ratings_large')
+
+	#Obtain userIds
+	query_large = spark.sql('SELECT distinct userId, movieId, rating FROM ratings_large')
+
+	#Iterate 
+	train_large_ratings = None
+	test_large_ratings = None
+	val_large_ratings = None
+
+	weights = [.7, .2, .1]
+	seed = 40
+
+	train_large_ratings, val_large_ratings, test_large_ratings = query_large.randomSplit(weights, seed)
+
+	print(train_large_ratings.count(), val_large_ratings.count(), test_large_ratings.count())
+	train_large_ratings.write.mode("overwrite").parquet(f'hdfs:/user/{netID}/{store_big}/train_ratings_{big}.parquet')
+	test_large_ratings.write.mode("overwrite").parquet(f'hdfs:/user/{netID}/{store_big}/test_ratings_{big}.parquet')
+	val_large_ratings.write.mode("overwrite").parquet(f'hdfs:/user/{netID}/{store_big}/val_ratings_{big}.parquet')	
 
 
 if __name__ == '__main__':
