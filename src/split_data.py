@@ -1,4 +1,5 @@
- the input data ratings and splits into train, validation and test data
+'''
+Takes the input data ratings and splits into train, validation and test data
 Stater code taken from lab3
 Data Copied to hfs, since working on spark
 spark-submit --conf  spark.dynamicAllocation.enabled=true --conf spark.shuffle.service.enabled=false --conf spark.dynamicAllocation.shuffleTracking.enabled=true

@@ -1,5 +1,4 @@
 export HADOOP_EXE='/usr/bin/hadoop'
-
 module load python/gcc/3.7.9
 module load spark/3.0.1
 
