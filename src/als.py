@@ -79,11 +79,16 @@ def als_grid_search_ranking(train,validation,maxIters,regParams, ranks,spark):
 def main(spark, netID):
     train_ratings_small = spark.read.parquet(f'hdfs:/user/{netID}/ml-latest-small/train_ratings_small.parquet')
     val_ratings_small = spark.read.parquet(f'hdfs:/user/{netID}/ml-latest-small/val_ratings_small.parquet')
+    train_ratings_large = spark.read.parquet(f'hdfs:/user/{netID}/ml-latest/train_ratings_big.parquet')
+    val_ratings_large = spark.read.parquet(f'hdfs:/user/{netID}/ml-latest/val_ratings_big.parquet')
+    
     maxIters = [5,10,15]
     regParams = [0.1, 0.01]
     ranks = [4,5,6,7,8,9,10,11,12]
-    models, precision_at_k_scores,maps, NDCGs,rmses,times = als_grid_search_ranking(train_ratings_small,val_ratings_small,maxIters,regParams, ranks,spark)
 
+    models, precision_at_k_scores,maps, NDCGs,rmses,times = als_grid_search_ranking(train_ratings_small,val_ratings_small,maxIters,regParams, ranks,spark)
+    models_large, precision_at_k_scores_large, maps_large, NDCGs_large, rmses_large, times_large = als_grid_search_ranking(train_ratings_large, val_ratings_large, maxIters, regParams, ranks,spark)
+    
     print("SMALL DATASET:")
     print('**********************************************************************************************')
     print(precision_at_k_scores)
@@ -95,6 +100,19 @@ def main(spark, netID):
     print(rmses)
     print('**********************************************************************************************')
     print(times)
+    print('**********************************************************************************************')
+
+    print("LARGE DATASET:")
+    print('**********************************************************************************************')
+    print(precision_at_k_scores_large)
+    print('**********************************************************************************************')
+    print(maps_large)
+    print('**********************************************************************************************')
+    print(NDCGs_large)
+    print('**********************************************************************************************')
+    print(rmses_large)
+    print('**********************************************************************************************')
+    print(times_large)
     print('**********************************************************************************************')
 
 
